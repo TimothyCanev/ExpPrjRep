@@ -167,11 +167,9 @@ function HomePage({ onNavigateToLogin }) {
           <div className="grid md:grid-cols-4 gap-8">
             {[
               { name: 'Timothy Canev & Filip Fekete', role: 'Software Engineers', icon: Users },
-              { name: 'Meno daj sem', role: 'Mechatronics', icon: TrendingUp },
-              { name: 'Meno daj sem', role: 'Electronics', icon: Award },
-              { name: 'Meno daj sem', role: 'EIB', icon: Wind },
-              { name: 'Meno daj sem', role: 'EIB', icon: Droplet },
-              { name: 'Meno daj sem', role: 'EIB', icon: Droplet }
+              { name: 'Igor Berent & Maria Ling Valverde', role: 'Mechatronics', icon: TrendingUp },
+              { name: 'Apostolos Lagourkakis & Sudodh Sapkota', role: 'Mechanics', icon: Award },
+              { name: 'Leventhe Horvath', role: 'Electronics', icon: Wind }
             ].map((member, index) => (
               <div key={index} className="text-center">
                 <div className="bg-gradient-to-br from-blue-900 to-green-700 w-32 h-32 rounded-full mx-auto mb-4 flex items-center justify-center">
