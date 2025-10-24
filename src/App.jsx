@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AlertCircle, Droplet, Users, MapPin, Award, TrendingUp, Wind } from 'lucide-react';
+import { incrementButtonPress } from './firebase'; // <-- Import the helper function
 
 // Hardcoded login credentials
 const VALID_USERNAME = 'admin';
@@ -266,6 +267,25 @@ function LoginPage({ onLogin, onBack }) {
     }
   };
 
+  // --- NEW HANDLER FOR THE "BACK TO HOME" BUTTON ---
+  const handleBackButtonClick = async () => {
+    try {
+      // Call the Firebase function to increment the counter
+      // Using 'loginPage' as the document ID and 'backToHome' as the field name
+      await incrementButtonPress('button_clicks', 'loginPage', 'backToHome');
+      console.log("Login page 'Back to Home' button press counted!");
+    } catch (err) {
+      console.error("Failed to increment 'Back to Home' button counter:", err);
+      // It's usually best to not block the user's action for a failed analytics count
+    }
+
+    // Now, execute the original 'onBack' function that was passed as a prop
+    if (onBack) {
+      onBack();
+    }
+  };
+  // --- END NEW HANDLER ---
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-green-800 flex items-center justify-center px-4">
       <div className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
@@ -314,15 +334,16 @@ function LoginPage({ onLogin, onBack }) {
           )}
 
           <button
-            type="submit"
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-colors"
-          >
-            Login
-          </button>
+          type="submit"
+          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-colors"
+        >
+          Login
+        </button>
 
+          {/* --- THIS IS YOUR TARGET BUTTON --- */}
           <button
             type="button"
-            onClick={onBack}
+            onClick={handleBackButtonClick} // <-- **CHANGED TO OUR NEW HANDLER**
             className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold transition-colors"
           >
             Back to Home
@@ -337,6 +358,7 @@ function LoginPage({ onLogin, onBack }) {
     </div>
   );
 }
+
 
 function DatabasePage({ onLogout }) {
   const getStatusColor = (status) => {
