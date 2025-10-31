@@ -1,22 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertCircle, Droplet, Users, MapPin, Award, TrendingUp, Wind } from 'lucide-react';
-import { incrementButtonPress } from './firebase'; // <-- Import the helper function
+import { incrementButtonPress, resetUrinalCounter, getUrinalData, sendMaintenanceAlert } from './firebase';
 
 // Hardcoded login credentials
 const VALID_USERNAME = 'admin';
 const VALID_PASSWORD = 'viscount2024';
-
-// Mock database data for urinals
-const mockUrinalData = [
-  { id: 'URN-001', location: 'Building A - Floor 1', uses: 2450, maxUses: 5000, status: 'good', lastMaintenance: '2024-09-15' },
-  { id: 'URN-002', location: 'Building A - Floor 2', uses: 4200, maxUses: 5000, status: 'warning', lastMaintenance: '2024-08-20' },
-  { id: 'URN-003', location: 'Building B - Floor 1', uses: 5100, maxUses: 5000, status: 'replace', lastMaintenance: '2024-07-10' },
-  { id: 'URN-004', location: 'Building B - Floor 2', uses: 1800, maxUses: 5000, status: 'good', lastMaintenance: '2024-09-28' },
-  { id: 'URN-005', location: 'Building C - Floor 1', uses: 3600, maxUses: 5000, status: 'good', lastMaintenance: '2024-09-01' },
-  { id: 'URN-006', location: 'Building C - Floor 2', uses: 4800, maxUses: 5000, status: 'warning', lastMaintenance: '2024-08-05' },
-  { id: 'URN-007', location: 'Building D - Floor 1', uses: 5300, maxUses: 5000, status: 'replace', lastMaintenance: '2024-06-22' },
-  { id: 'URN-008', location: 'Building D - Floor 2', uses: 2100, maxUses: 5000, status: 'good', lastMaintenance: '2024-09-18' },
-];
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
@@ -63,6 +51,8 @@ function HomePage({ onNavigateToLogin }) {
           </button>
         </div>
       </header>
+
+      
 
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-blue-900 via-blue-800 to-green-800 text-white py-24 px-8">
@@ -267,24 +257,18 @@ function LoginPage({ onLogin, onBack }) {
     }
   };
 
-  // --- NEW HANDLER FOR THE "BACK TO HOME" BUTTON ---
   const handleBackButtonClick = async () => {
     try {
-      // Call the Firebase function to increment the counter
-      // Using 'loginPage' as the document ID and 'backToHome' as the field name
       await incrementButtonPress('button_clicks', 'loginPage', 'backToHome');
       console.log("Login page 'Back to Home' button press counted!");
     } catch (err) {
       console.error("Failed to increment 'Back to Home' button counter:", err);
-      // It's usually best to not block the user's action for a failed analytics count
     }
 
-    // Now, execute the original 'onBack' function that was passed as a prop
     if (onBack) {
       onBack();
     }
   };
-  // --- END NEW HANDLER ---
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-green-800 flex items-center justify-center px-4">
@@ -343,7 +327,7 @@ function LoginPage({ onLogin, onBack }) {
           {/* --- THIS IS YOUR TARGET BUTTON --- */}
           <button
             type="button"
-            onClick={handleBackButtonClick} // <-- **CHANGED TO OUR NEW HANDLER**
+            onClick={handleBackButtonClick}
             className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold transition-colors"
           >
             Back to Home
@@ -361,6 +345,53 @@ function LoginPage({ onLogin, onBack }) {
 
 
 function DatabasePage({ onLogout }) {
+  const [urinalData, setUrinalData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await getUrinalData();
+        setUrinalData(data);
+      } catch (error) {
+        console.error('Error fetching urinal data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Check for maintenance alerts when data updates
+  useEffect(() => {
+    urinalData.forEach(async (urinal) => {
+      const usagePercent = (urinal.uses / urinal.maxUses) * 100;
+      
+      // Only alert if at or above 80%
+      if (usagePercent >= 80 && urinal.maintPhone) {
+        await sendMaintenanceAlert(
+          urinal.id,
+          urinal.uses,
+          urinal.maxUses,
+          urinal.maintPhone,
+          urinal.location,
+          urinal.email
+        );
+      }
+    });
+  }, [urinalData]);
+
+  const handleResetCounter = async (devicesId) => {
+    if (window.confirm(`Are you sure you want to reset the counter for ${devicesId}?`)) {
+      const success = await resetUrinalCounter(devicesId);
+      if (success) {
+        // Refresh the data
+        const data = await getUrinalData();
+        setUrinalData(data);
+      }
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'good': return 'bg-green-100 text-green-800 border-green-200';
@@ -379,9 +410,10 @@ function DatabasePage({ onLogout }) {
     }
   };
 
-  const goodCount = mockUrinalData.filter(u => u.status === 'good').length;
-  const warningCount = mockUrinalData.filter(u => u.status === 'warning').length;
-  const replaceCount = mockUrinalData.filter(u => u.status === 'replace').length;
+  const goodCount = urinalData.filter(u => u.status === 'good').length;
+  const warningCount = urinalData.filter(u => u.status === 'warning').length;
+  const replaceCount = urinalData.filter(u => u.status === 'replace').length;
+  const totalUses = urinalData.reduce((sum, u) => sum + (u.uses || 0), 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -405,23 +437,13 @@ function DatabasePage({ onLogout }) {
       </header>
 
       <div className="max-w-7xl mx-auto px-8 py-8">
+        
         {/* Summary Cards */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-gray-600 text-sm font-medium mb-2">Total Units</h3>
-            <p className="text-3xl font-bold text-blue-900">{mockUrinalData.length}</p>
-          </div>
-          <div className="bg-green-50 p-6 rounded-lg shadow-md border-2 border-green-200">
-            <h3 className="text-gray-600 text-sm font-medium mb-2">Good Condition</h3>
-            <p className="text-3xl font-bold text-green-700">{goodCount}</p>
-          </div>
-          <div className="bg-yellow-50 p-6 rounded-lg shadow-md border-2 border-yellow-200">
-            <h3 className="text-gray-600 text-sm font-medium mb-2">Needs Maintenance</h3>
-            <p className="text-3xl font-bold text-yellow-700">{warningCount}</p>
-          </div>
-          <div className="bg-red-50 p-6 rounded-lg shadow-md border-2 border-red-200">
-            <h3 className="text-gray-600 text-sm font-medium mb-2">Replacement Needed</h3>
-            <p className="text-3xl font-bold text-red-700">{replaceCount}</p>
+        <div className="bg-white p-8 rounded-lg shadow-md mb-8">
+          <div className="text-center">
+            <h3 className="text-gray-600 text-lg font-medium mb-2">Total Toilet Usage</h3>
+            <p className="text-6xl font-bold text-blue-900 mb-4">{totalUses.toLocaleString()}</p>
+            <p className="text-gray-500">Combined usage across all locations</p>
           </div>
         </div>
 
@@ -437,7 +459,7 @@ function DatabasePage({ onLogout }) {
               <thead className="bg-gray-50 border-b-2 border-gray-200">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Unit ID
+                    Device
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Location
@@ -454,10 +476,13 @@ function DatabasePage({ onLogout }) {
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Status
                   </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {mockUrinalData.map((urinal) => {
+                <tbody className="divide-y divide-gray-200">
+                {urinalData.map((urinal) => {
                   const usagePercent = Math.round((urinal.uses / urinal.maxUses) * 100);
                   return (
                     <tr key={urinal.id} className="hover:bg-gray-50 transition-colors">
@@ -492,6 +517,14 @@ function DatabasePage({ onLogout }) {
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(urinal.status)}`}>
                           {getStatusText(urinal.status)}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => handleResetCounter(urinal.id)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                        >
+                          Reset Counter
+                        </button>
                       </td>
                     </tr>
                   );
