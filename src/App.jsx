@@ -362,29 +362,53 @@ function DatabasePage({ onLogout }) {
     fetchData();
   }, []);
 
+// Track which devices have been alerted
+  const [alertedDevices, setAlertedDevices] = useState(new Set());
+
   // Check for maintenance alerts when data updates
   useEffect(() => {
-    urinalData.forEach(async (urinal) => {
-      const usagePercent = (urinal.uses / urinal.maxUses) * 100;
-      
-      // Only alert if at or above 80%
-      if (usagePercent >= 80 && urinal.maintPhone) {
-        await sendMaintenanceAlert(
-          urinal.id,
-          urinal.uses,
-          urinal.maxUses,
-          urinal.maintPhone,
-          urinal.location,
-          urinal.email
-        );
+    const sendAlerts = async () => {
+      for (const urinal of urinalData) {
+        const usagePercent = (urinal.uses / urinal.maxUses) * 100;
+        
+        // Only send alert if >= 80% and not already alerted
+        if (usagePercent >= 80 && !alertedDevices.has(urinal.id)) {
+          const success = await sendMaintenanceAlert(
+            urinal.id,
+            urinal.uses,
+            urinal.maxUses,
+            urinal.maintPhone,
+            urinal.location,
+            urinal.email
+          );
+          
+          // Mark as alerted if successful
+          if (success) {
+            setAlertedDevices(prev => new Set([...prev, urinal.id]));
+          }
+          
+          // Wait between emails to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
-    });
+    };
+    
+    if (urinalData.length > 0) {
+      sendAlerts();
+    }
   }, [urinalData]);
 
-  const handleResetCounter = async (devicesId) => {
-    if (window.confirm(`Are you sure you want to reset the counter for ${devicesId}?`)) {
-      const success = await resetUrinalCounter(devicesId);
+const handleResetCounter = async (urinalId) => {
+    if (window.confirm(`Are you sure you want to reset the counter for ${urinalId}?`)) {
+      const success = await resetUrinalCounter(urinalId);
       if (success) {
+        // Remove from alerted devices so it can be alerted again
+        setAlertedDevices(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(urinalId);
+          return newSet;
+        });
+        
         // Refresh the data
         const data = await getUrinalData();
         setUrinalData(data);

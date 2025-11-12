@@ -85,11 +85,14 @@ export async function sendMaintenanceAlert(deviceId, uses, maxUses, maintPhone, 
     console.log('🚨 ALERT TRIGGERED! Sending email notification...');
     
     try {
+      // Add a small delay between emails to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const result = await emailjs.send(
         'Viscount_Waterless',  // service ID
         'template_sq5g4r7', //template ID
         {
-          to_email: email,      // Email from Firebase
+          to_email: email,
           device_id: deviceId,
           location: location,
           usage_percent: usagePercent,
@@ -99,12 +102,10 @@ export async function sendMaintenanceAlert(deviceId, uses, maxUses, maintPhone, 
         }
       );
       
-      console.log('✅ Email alert sent successfully!', result);
-      alert(`⚠️ Maintenance alert sent to ${email} for device ${deviceId}!`);
+      console.log('✅ Email alert sent successfully to:', email, result);
       return true;
     } catch (error) {
       console.error('❌ Error sending email alert:', error);
-      alert(`❌ Failed to send alert: ${error.text || error.message}`);
       return false;
     }
   } else if (usagePercent >= 80 && !email) {
