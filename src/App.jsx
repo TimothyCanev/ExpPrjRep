@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AlertCircle, Droplet, Users, MapPin, Award, TrendingUp, Wind } from 'lucide-react';
+import { AlertCircle, Droplet, Users, MapPin, Award, TrendingUp, Wind, ChevronDown } from 'lucide-react';
 import { incrementButtonPress, resetUrinalCounter, getUrinalData, sendMaintenanceAlert } from './firebase';
 
 // Hardcoded login credentials
@@ -364,6 +364,7 @@ function DatabasePage({ onLogout }) {
 
 // Track which devices have been alerted
   const [alertedDevices, setAlertedDevices] = useState(new Set());
+  const [expandedRows, setExpandedRows] = useState(new Set());
 
   // Check for maintenance alerts when data updates
   useEffect(() => {
@@ -415,6 +416,18 @@ const handleResetCounter = async (urinalId) => {
       }
     }
   };
+
+  const toggleRow = (urinalId) => {
+  setExpandedRows(prev => {
+    const newSet = new Set(prev);
+    if (newSet.has(urinalId)) {
+      newSet.delete(urinalId);
+    } else {
+      newSet.add(urinalId);
+    }
+    return newSet;
+  });
+};
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -500,60 +513,82 @@ const handleResetCounter = async (urinalId) => {
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Actions
-                  </th>
                 </tr>
               </thead>
                 <tbody className="divide-y divide-gray-200">
-                {urinalData.map((urinal) => {
-                  const usagePercent = Math.round((urinal.uses / urinal.maxUses) * 100);
-                  return (
-                    <tr key={urinal.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="font-mono font-semibold text-blue-900">{urinal.id}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-700">
-                        {urinal.location}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="font-semibold text-gray-900">{urinal.uses.toLocaleString()}</span>
-                        <span className="text-gray-500 text-sm"> / {urinal.maxUses.toLocaleString()}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <div className="w-24 bg-gray-200 rounded-full h-2">
-                            <div
-                              className={`h-2 rounded-full ${
-                                usagePercent >= 100 ? 'bg-red-600' :
-                                usagePercent >= 80 ? 'bg-yellow-500' : 'bg-green-600'
-                              }`}
-                              style={{ width: `${Math.min(usagePercent, 100)}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-sm font-medium text-gray-700">{usagePercent}%</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {urinal.lastMaintenance}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(urinal.status)}`}>
-                          {getStatusText(urinal.status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <button
-                          onClick={() => handleResetCounter(urinal.id)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-                        >
-                          Reset Counter
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
+  {urinalData.map((urinal) => {
+    const usagePercent = Math.round((urinal.uses / urinal.maxUses) * 100);
+    const isExpanded = expandedRows.has(urinal.id);
+    return (
+      <>
+        <tr 
+          key={urinal.id} 
+          className="hover:bg-gray-50 transition-colors cursor-pointer"
+          onClick={() => toggleRow(urinal.id)}
+        >
+          <td className="px-6 py-4 whitespace-nowrap">
+            <div className="flex items-center gap-2">
+              <ChevronDown 
+                className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+              />
+              <span className="font-mono font-semibold text-blue-900">{urinal.id}</span>
+            </div>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-gray-700">
+            {urinal.location}
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <span className="font-semibold text-gray-900">{urinal.uses.toLocaleString()}</span>
+            <span className="text-gray-500 text-sm"> / {urinal.maxUses.toLocaleString()}</span>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <div className="flex items-center gap-2">
+              <div className="w-24 bg-gray-200 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full ${
+                    usagePercent >= 100 ? 'bg-red-600' :
+                    usagePercent >= 80 ? 'bg-yellow-500' : 'bg-green-600'
+                  }`}
+                  style={{ width: `${Math.min(usagePercent, 100)}%` }}
+                ></div>
+              </div>
+              <span className="text-sm font-medium text-gray-700">{usagePercent}%</span>
+            </div>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+            {urinal.lastMaintenance}
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(urinal.status)}`}>
+              {getStatusText(urinal.status)}
+            </span>
+          </td>
+        </tr>
+        {isExpanded && (
+          <tr key={`${urinal.id}-expanded`} className="bg-blue-50">
+            <td colSpan="6" className="px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  <p><strong>Email:</strong> {urinal.email || 'Not set'}</p>
+                  <p><strong>Phone:</strong> {urinal.maintPhone || 'Not set'}</p>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleResetCounter(urinal.id);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-semibold transition-colors"
+                >
+                  Reset Counter
+                </button>
+              </div>
+            </td>
+          </tr>
+        )}
+      </>
+    );
+  })}
+</tbody>
             </table>
           </div>
         </div>
