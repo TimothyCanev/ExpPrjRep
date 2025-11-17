@@ -39,22 +39,35 @@ export async function getUrinalData() {
     
     const urinalData = snapshot.docs.map(doc => {
       const data = doc.data();
+      const uses = data.uses || 0;
+      const maxUses = data.maxUses || 5000;
+      const usagePercent = (uses / maxUses) * 100;
+      
+      // Calculate status based on usage percentage
+      let status = 'good';
+      if (usagePercent >= 100) {
+        status = 'replace';
+      } else if (usagePercent >= 80) {
+        status = 'warning';
+      }
+      
       return {
         id: data.id || doc.id,
         location: data.location || 'Unknown Location',
-        uses: data.uses || 0,
-        maxUses: data.maxUses || 5000,
-        status: data.status || 'good',
+        uses: uses,
+        maxUses: maxUses,
+        status: status, // Now dynamically calculated
         lastMaintenance: data.lastMaintenance || 'N/A',
         maintPhone: data.maintPhone || '',
-        email: data.email || ''
+        email: data.email || '',
+        coordinates: data.coordinates || null
       };
     });
     
     return urinalData;
   } catch (error) {
     console.error('Error fetching urinal data from Firebase:', error);
-    return []; // Return empty array on error
+    return [];
   }
 }
 

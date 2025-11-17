@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { AlertCircle, Droplet, Users, MapPin, Award, TrendingUp, Wind, ChevronDown } from 'lucide-react';
+import { AlertCircle, Droplet, Users, MapPin, Award, TrendingUp, Wind, ChevronDown, Map } from 'lucide-react';
+import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
 import { incrementButtonPress, resetUrinalCounter, getUrinalData, sendMaintenanceAlert } from './firebase';
+
 
 // Hardcoded login credentials
 const VALID_USERNAME = 'admin';
@@ -365,6 +367,8 @@ function DatabasePage({ onLogout }) {
 // Track which devices have been alerted
   const [alertedDevices, setAlertedDevices] = useState(new Set());
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [sortFilter, setSortFilter] = useState('all'); // 'all', 'good', 'warning', 'replace'
+  const [selectedMarker, setSelectedMarker] = useState(null);
 
   // Check for maintenance alerts when data updates
   useEffect(() => {
@@ -491,6 +495,52 @@ const handleResetCounter = async (urinalId) => {
             <p className="text-blue-100 text-sm mt-1">Real-time monitoring and maintenance tracking</p>
           </div>
           
+{/* Filter Buttons */}
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setSortFilter('all')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  sortFilter === 'all' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                All Devices
+              </button>
+              <button
+                onClick={() => setSortFilter('good')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  sortFilter === 'good' 
+                    ? 'bg-green-600 text-white' 
+                    : 'bg-green-100 text-green-800 hover:bg-green-200'
+                }`}
+              >
+                Good ({goodCount})
+              </button>
+              <button
+                onClick={() => setSortFilter('warning')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  sortFilter === 'warning' 
+                    ? 'bg-yellow-600 text-white' 
+                    : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                }`}
+              >
+                Maintenance Soon ({warningCount})
+              </button>
+              <button
+                onClick={() => setSortFilter('replace')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  sortFilter === 'replace' 
+                    ? 'bg-red-600 text-white' 
+                    : 'bg-red-100 text-red-800 hover:bg-red-200'
+                }`}
+              >
+                Replace Needed ({replaceCount})
+              </button>
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b-2 border-gray-200">
@@ -515,8 +565,10 @@ const handleResetCounter = async (urinalId) => {
                   </th>
                 </tr>
               </thead>
-                <tbody className="divide-y divide-gray-200">
-  {urinalData.map((urinal) => {
+        <tbody className="divide-y divide-gray-200">
+          {urinalData
+    .filter(urinal => sortFilter === 'all' || urinal.status === sortFilter)
+    .map((urinal) => {
     const usagePercent = Math.round((urinal.uses / urinal.maxUses) * 100);
     const isExpanded = expandedRows.has(urinal.id);
     return (
@@ -608,6 +660,96 @@ const handleResetCounter = async (urinalId) => {
           </div>
         )}
       </div>
+      {/* Map Section */}
+        <div className="mt-8 bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-900 to-green-800 px-6 py-4">
+            <div className="flex items-center gap-2">
+              <Map className="w-6 h-6 text-white" />
+              <h2 className="text-xl font-bold text-white">Map Usage</h2>
+            </div>
+            <p className="text-blue-100 text-sm mt-1">Geographic distribution of all devices</p>
+          </div>
+          
+          <div className="h-[600px] w-full">
+            <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
+              <GoogleMap
+                mapContainerStyle={{ width: '100%', height: '100%' }}
+                center={{ lat: 55.0, lng: 10.0 }} // Centered on Denmark
+                zoom={7}
+                options={{
+                  streetViewControl: false,
+                  mapTypeControl: false,
+                }}
+              >
+                {urinalData.map((urinal) => {
+                  // You need to add lat/lng to your Firebase data
+                  // For now, using mock coordinates - replace with real data
+                  const position = urinal.coordinates || { 
+                    lat: 55.0 + (Math.random() - 0.5) * 2, 
+                    lng: 10.0 + (Math.random() - 0.5) * 2 
+                  };
+                  
+                  const usagePercent = (urinal.uses / urinal.maxUses) * 100;
+                  const markerColor = usagePercent >= 100 ? '#DC2626' : 
+                                     usagePercent >= 80 ? '#EAB308' : '#16A34A';
+                  
+                  return (
+                    <Marker
+                      key={urinal.id}
+                      position={position}
+                      onClick={() => setSelectedMarker(urinal)}
+                      icon={{
+                        path: window.google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: markerColor,
+                        fillOpacity: 0.8,
+                        strokeColor: '#fff',
+                        strokeWeight: 2,
+                      }}
+                    />
+                  );
+                })}
+                
+                {selectedMarker && (
+                  <InfoWindow
+                    position={selectedMarker.coordinates || { 
+                      lat: 55.0 + (Math.random() - 0.5) * 2, 
+                      lng: 10.0 + (Math.random() - 0.5) * 2 
+                    }}
+                    onCloseClick={() => setSelectedMarker(null)}
+                  >
+                    <div className="p-2">
+                      <h3 className="font-bold text-blue-900 mb-2">{selectedMarker.id}</h3>
+                      <p className="text-sm text-gray-700"><strong>Location:</strong> {selectedMarker.location}</p>
+                      <p className="text-sm text-gray-700"><strong>Usage:</strong> {selectedMarker.uses.toLocaleString()} / {selectedMarker.maxUses.toLocaleString()}</p>
+                      <p className="text-sm text-gray-700"><strong>Status:</strong> <span className={`font-semibold ${
+                        selectedMarker.status === 'good' ? 'text-green-600' :
+                        selectedMarker.status === 'warning' ? 'text-yellow-600' : 'text-red-600'
+                      }`}>{getStatusText(selectedMarker.status)}</span></p>
+                    </div>
+                  </InfoWindow>
+                )}
+              </GoogleMap>
+            </LoadScript>
+          </div>
+          
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <div className="flex items-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-green-600"></div>
+                <span className="text-gray-700">Good Condition</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-yellow-500"></div>
+                <span className="text-gray-700">Maintenance Soon</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-red-600"></div>
+                <span className="text-gray-700">Replacement Needed</span>
+              </div>
+            </div>
+          </div>
+        </div>
     </div>
   );
 }
